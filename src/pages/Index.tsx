@@ -1,3 +1,4 @@
+import React from 'react';
 import { ParticleBackground } from '@/components/ParticleBackground';
 import { RegistrationForm } from '@/components/RegistrationForm';
 
