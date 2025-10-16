@@ -124,6 +124,7 @@ All colors MUST be HSL.
 
   .glow-spiritual {
     text-shadow: var(--glow-spiritual);
+    line-height: 1.2;
   }
 
   .glow-gold {
