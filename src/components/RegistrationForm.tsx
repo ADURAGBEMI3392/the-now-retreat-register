@@ -57,46 +57,39 @@ export const RegistrationForm = () => {
     setIsSubmitting(true);
 
     try {
-      let photoUrl = '';
-      
-      // Upload photo if provided
+      // Build multipart form data so the backend can handle file + fields together
+      const formData = new FormData();
+      formData.append('fullName', data.fullName);
+      formData.append('gender', data.gender);
+      formData.append('age', String(data.age));
+      formData.append('phone', data.phone);
+      formData.append('email', data.email);
+      formData.append('location', data.location);
+      if (data.church) formData.append('church', data.church);
+      formData.append('affiliation', data.affiliation);
+      if (data.howHeard) formData.append('howHeard', data.howHeard);
+      if (data.dramaMINISTRY) formData.append('dramaMINISTRY', data.dramaMINISTRY);
+      if (data.worshipMinister) formData.append('worshipMinister', data.worshipMinister);
+      if (data.expectations) formData.append('expectations', data.expectations);
+      if (data.helpNeeded) formData.append('helpNeeded', data.helpNeeded);
+      if (data.prayerRequests) formData.append('prayerRequests', data.prayerRequests);
+      formData.append('confirmation', String(data.confirmation));
       if (data.photo && data.photo.length > 0) {
-        const photoFile = data.photo[0];
-        const photoFormData = new FormData();
-        photoFormData.append('photo', photoFile);
-        
-        try {
-          const photoResponse = await fetch(
-            'https://script.google.com/macros/s/AKfycby8WjHEKZWApPTeGs9Y0s4O9aHwvbSFZTJhj0WBeAzygVrfd5_Kdj9PSYwfPU0uQpGzSQ/exec',
-            {
-              method: 'POST',
-              body: photoFormData,
-            }
-          );
-          const photoResult = await photoResponse.json();
-          photoUrl = photoResult.url || '';
-        } catch (photoError) {
-          console.error('Photo upload error:', photoError);
-        }
+        formData.append('photo', data.photo[0]);
       }
 
-      // Submit form data with photo URL
-      const submitData = {
-        ...data,
-        photo: photoUrl,
-      };
-
-      await fetch(
-        'https://script.google.com/macros/s/AKfycbxT53CQYEscL2PIP550vlKfbhNhWykCsMnFr44TIDPncRYexv_LvmHSReB5eo4fjzrMDA/exec',
+      const response = await fetch(
+        'https://script.google.com/macros/s/AKfycbxGO3ValoegB43FmhH1L8I5maap37fLhJm6I4SvmNpxXPRCG1lPdQO_OtcuNJ2QpMq9IQ/exec',
         {
           method: 'POST',
-          mode: 'no-cors',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(submitData),
+          body: formData,
         }
       );
+
+      // Try reading JSON but don't fail if endpoint returns no body
+      try {
+        await response.json();
+      } catch {}
 
       setShowSuccess(true);
       reset();
@@ -141,7 +134,7 @@ export const RegistrationForm = () => {
         {/* Floating Home Icon */}
         <a
           href="https://oog.lovable.app/"
-          className="fixed top-6 left-6 z-50 w-12 h-12 bg-primary/20 backdrop-blur-md rounded-full flex items-center justify-center border border-primary/30 hover:bg-primary/30 hover:scale-110 hover:shadow-lg hover:shadow-primary/50 transition-all duration-300 group"
+          className="fixed top-6 left-6 z-50 w-12 h-12 bg-primary/20 backdrop-blur-md rounded-full flex items-center justify-center border border-primary/30 hover:bg-primary/30 hover:scale-110 hover:shadow-lg hover:shadow-primary/50 hover:animate-pulse-glow transition-all duration-300 group"
           aria-label="Return to Home"
         >
           <svg
