@@ -79,17 +79,18 @@ export const RegistrationForm = () => {
       }
 
       const response = await fetch(
-        'https://script.google.com/macros/s/AKfycbxGO3ValoegB43FmhH1L8I5maap37fLhJm6I4SvmNpxXPRCG1lPdQO_OtcuNJ2QpMq9IQ/exec',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-registration`,
         {
           method: 'POST',
           body: formData,
         }
       );
 
-      // Try reading JSON but don't fail if endpoint returns no body
-      try {
-        await response.json();
-      } catch {}
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Submission failed');
+      }
 
       setShowSuccess(true);
       reset();
@@ -97,8 +98,8 @@ export const RegistrationForm = () => {
     } catch (error) {
       console.error('Submission error:', error);
       toast({
-        title: 'Submission Error',
-        description: 'There was an issue submitting your registration. Please try again.',
+        title: '⚠️ Submission Failed',
+        description: 'Unable to send your form. Please check your connection and try again.',
         variant: 'destructive',
       });
     } finally {

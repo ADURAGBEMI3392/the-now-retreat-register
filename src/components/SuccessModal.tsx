@@ -18,11 +18,11 @@ export const SuccessModal = ({ isOpen, onClose, onRegisterAnother }: SuccessModa
             <CheckCircle className="w-20 h-20 text-primary animate-fade-in glow-gold" />
           </div>
           <DialogTitle className="font-cinzel text-3xl text-center text-gradient-spiritual">
-            Registration Received
+            ✅ Thank You!
           </DialogTitle>
           <DialogDescription className="text-center text-lg space-y-4">
             <p className="text-foreground">
-              Your registration has been successfully received.
+              Thank you for registering for Renewing of Minds! Your details have been received successfully.
             </p>
             <p className="font-cinzel text-xl text-primary animate-pulse-glow">
               We await you in THE NOW.
