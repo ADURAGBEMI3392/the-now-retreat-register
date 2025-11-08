@@ -82,6 +82,9 @@ export const RegistrationForm = () => {
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-registration`,
         {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
           body: formData,
         }
       );
