@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { SuccessModal } from './SuccessModal';
+import { Progress } from '@/components/ui/progress';
 
 const formSchema = z.object({
   fullName: z.string().min(2, 'Please share your full name'),
@@ -39,6 +40,10 @@ export const RegistrationForm = () => {
   const [showDramaMessage, setShowDramaMessage] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const { toast } = useToast();
+  const DRAFT_KEY = 'registrationFormDraft';
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [showErrorSummary, setShowErrorSummary] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
@@ -49,11 +54,72 @@ export const RegistrationForm = () => {
     watch,
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
+    mode: 'onChange',
   });
 
   const dramaMinistryValue = watch('dramaMINISTRY');
 
+  const values = watch();
+  const requiredTotal = 8;
+  const completed = useMemo(() => {
+    let count = 0;
+    if (values.fullName?.trim().length >= 2) count++;
+    if (values.gender) count++;
+    if (typeof values.age === 'number' && values.age > 0) count++;
+    if (values.phone?.trim().length >= 10) count++;
+    if (values.email?.includes('@')) count++;
+    if (values.location?.trim().length >= 2) count++;
+    if (values.affiliation) count++;
+    if (values.confirmation === true) count++;
+    return count;
+  }, [values]);
+  const progressValue = Math.round((completed / requiredTotal) * 100);
+
+  // Load draft on mount and warn before leaving
+  React.useEffect(() => {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      try {
+        const draft = JSON.parse(raw);
+        delete draft.photo;
+        reset(draft);
+      } catch {}
+    }
+    const beforeUnload = (e: BeforeUnloadEvent) => {
+      const hasDraft = !!localStorage.getItem(DRAFT_KEY);
+      if (hasDraft) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => window.removeEventListener('beforeunload', beforeUnload);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Debounced autosave
+  React.useEffect(() => {
+    const toSave: any = { ...values };
+    delete toSave.photo;
+    const id = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(toSave));
+        setLastSavedAt(new Date());
+      } catch {}
+    }, 800);
+    return () => clearTimeout(id);
+  }, [values]);
+
   const onSubmit = async (data: FormData) => {
+    setShowErrorSummary(false);
+    if (!navigator.onLine) {
+      toast({
+        title: 'You appear to be offline',
+        description: 'Please connect to the internet and try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -98,6 +164,7 @@ export const RegistrationForm = () => {
       setShowSuccess(true);
       reset();
       setPhotoPreview(null);
+      localStorage.removeItem(DRAFT_KEY);
     } catch (error) {
       console.error('Submission error:', error);
       toast({
@@ -110,10 +177,25 @@ export const RegistrationForm = () => {
     }
   };
 
+  const onInvalid = (errs: Record<string, any>) => {
+    setShowErrorSummary(true);
+    const firstKey = Object.keys(errs)[0];
+    if (firstKey) {
+      document.getElementById(firstKey)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    toast({
+      title: 'Please fix the highlighted errors',
+      description: `We found ${Object.keys(errs).length} issue(s).` ,
+      variant: 'destructive',
+    });
+  };
+
   const handleReset = () => {
     reset();
     setShowDramaMessage(false);
     setPhotoPreview(null);
+    setShowErrorSummary(false);
+    localStorage.removeItem(DRAFT_KEY);
     toast({
       title: 'Form Cleared',
       description: 'All fields have been reset.',
@@ -159,6 +241,15 @@ export const RegistrationForm = () => {
         </a>
 
         <div className="glass-morphic rounded-3xl p-8 md:p-12 shadow-2xl glow-gold">
+          {/* Progress */}
+          <div className="mb-8 space-y-2 sticky top-4 z-40">
+            <div className="flex items-center justify-between text-sm text-muted-foreground font-inter">
+              <span>Form completion</span>
+              <span>{progressValue}%{lastSavedAt ? ` • Saved ${lastSavedAt.toLocaleTimeString()}` : ''}</span>
+            </div>
+            <Progress value={progressValue} className="h-2" />
+          </div>
+
           {/* Header */}
           <div className="text-center mb-12 space-y-6 py-4">
             <h1 className="font-cinzel text-4xl md:text-5xl font-bold text-foreground">
@@ -173,7 +264,25 @@ export const RegistrationForm = () => {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
+          {showErrorSummary && Object.keys(errors).length > 0 && (
+            <div className="mb-6 p-4 border border-destructive/30 bg-destructive/10 rounded-lg">
+              <p className="font-semibold text-destructive mb-2 font-inter">Please review the following:</p>
+              <ul className="list-disc pl-5 space-y-1 text-sm font-inter">
+                {Object.entries(errors).map(([key, val]) => (
+                  <li key={key}>
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById(key)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                      className="underline hover:no-underline text-foreground"
+                    >
+                      {(val as any)?.message || key}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-10">
             {/* Personal Details Section */}
             <section className="space-y-6">
               <h3 className="font-cinzel text-2xl font-bold text-primary border-b-2 border-primary/30 pb-2">
@@ -195,9 +304,8 @@ export const RegistrationForm = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="gender">Gender *</Label>
-                  <Select onValueChange={(value) => setValue('gender', value)}>
-                    <SelectTrigger className="glass-morphic font-inter">
+                  <Select onValueChange={(value) => setValue('gender', value, { shouldValidate: true, shouldDirty: true })}>
+                    <SelectTrigger id="gender" className="glass-morphic font-inter">
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
                     <SelectContent className="bg-background/95 backdrop-blur-md border-primary/20">
@@ -277,8 +385,8 @@ export const RegistrationForm = () => {
 
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="affiliation">Affiliation *</Label>
-                  <Select onValueChange={(value) => setValue('affiliation', value)}>
-                    <SelectTrigger className="glass-morphic font-inter">
+                  <Select onValueChange={(value) => setValue('affiliation', value, { shouldValidate: true, shouldDirty: true })}>
+                    <SelectTrigger id="affiliation" className="glass-morphic font-inter">
                       <SelectValue placeholder="Select affiliation" />
                     </SelectTrigger>
                     <SelectContent className="bg-background/95 backdrop-blur-md border-primary/20">
@@ -345,8 +453,8 @@ export const RegistrationForm = () => {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="howHeard">How did you hear about us?</Label>
-                  <Select onValueChange={(value) => setValue('howHeard', value)}>
-                    <SelectTrigger className="glass-morphic font-inter">
+                  <Select onValueChange={(value) => setValue('howHeard', value, { shouldDirty: true })}>
+                    <SelectTrigger id="howHeard" className="glass-morphic font-inter">
                       <SelectValue placeholder="Select option" />
                     </SelectTrigger>
                     <SelectContent className="bg-background/95 backdrop-blur-md border-primary/20">
@@ -366,11 +474,11 @@ export const RegistrationForm = () => {
                   </Label>
                   <Select
                     onValueChange={(value) => {
-                      setValue('dramaMINISTRY', value);
+                      setValue('dramaMINISTRY', value, { shouldDirty: true });
                       setShowDramaMessage(value === 'Yes');
                     }}
                   >
-                    <SelectTrigger className="glass-morphic font-inter">
+                    <SelectTrigger id="dramaMINISTRY" className="glass-morphic font-inter">
                       <SelectValue placeholder="Select option" />
                     </SelectTrigger>
                     <SelectContent className="bg-background/95 backdrop-blur-md border-primary/20">
@@ -388,8 +496,8 @@ export const RegistrationForm = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="worshipMinister">Are you a Worship Minister?</Label>
-                  <Select onValueChange={(value) => setValue('worshipMinister', value)}>
-                    <SelectTrigger className="glass-morphic font-inter">
+                  <Select onValueChange={(value) => setValue('worshipMinister', value, { shouldDirty: true })}>
+                    <SelectTrigger id="worshipMinister" className="glass-morphic font-inter">
                       <SelectValue placeholder="Select option" />
                     </SelectTrigger>
                     <SelectContent className="bg-background/95 backdrop-blur-md border-primary/20">
@@ -438,7 +546,7 @@ export const RegistrationForm = () => {
               <div className="flex items-start space-x-3 p-4 glass-morphic rounded-lg">
                 <Checkbox
                   id="confirmation"
-                  onCheckedChange={(checked) => setValue('confirmation', checked as boolean)}
+                  onCheckedChange={(checked) => setValue('confirmation', checked as boolean, { shouldValidate: true, shouldDirty: true })}
                 />
                 <Label htmlFor="confirmation" className="text-sm leading-relaxed cursor-pointer font-inter">
                   By submitting, I confirm that all information provided is true and I'm prepared
